@@ -1,0 +1,27 @@
+MYN Deco — saved reference version, 18 November 2026
+===================================================
+This is the current 24-route Next.js source version with the KL Fix-inspired design.
+No new design changes have been applied to this snapshot.
+
+RUN LOCALLY
+1. Extract this ZIP.
+2. Open a terminal inside the myn-deco folder.
+3. Use Node.js 20.9 or newer.
+4. Run: npm ci
+5. Run: npm run dev
+6. Open: http://127.0.0.1:5173/
+
+CHECK / BUILD
+npm run typecheck
+npm run build
+The production export is generated in out/.
+
+CONTENTS
+- Complete Next.js source, package lockfile, configuration, images and local fonts.
+- Active routes: src/app; active views: RepairHome.tsx and SitePage.tsx.
+- Earlier MYN components remain in src/components for future reuse.
+- REBUILD_GUIDE.md describes the historical Vite version. Follow this file and README.md for the current Next.js version.
+- node_modules, build output, caches, logs and secrets are excluded.
+- Illustrative imagery is labelled in the site; no customer testimonials have been invented.
+- The enquiry form opens WhatsApp for review and sending; there is no form-storage backend.
+- Nothing was pushed or deployed.
