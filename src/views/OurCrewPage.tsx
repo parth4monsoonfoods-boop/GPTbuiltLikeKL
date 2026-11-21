@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ArrowLeft, Shield, Wrench, Sparkles, Camera, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Shield, Wrench, Sparkles, Camera } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { ContactSection } from '@/components/ContactSection';
 import { Footer } from '@/components/Footer';

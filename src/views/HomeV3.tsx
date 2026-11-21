@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Clock3, MapPin, MessageCircle, Phone, Plus } from 'lucide-react';
+import { ArrowUpRight, Clock3, MapPin, MessageCircle, Plus } from 'lucide-react';
 import { company } from '@/content/site';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -36,7 +36,6 @@ const wa = (service = 'a repair or renovation') =>
   `https://wa.me/${company.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
     `Hi MYN Deco, I need help with ${service}.\nLocation / postcode: \nWhat needs doing: \nPreferred timing: \nI can share photos here.`,
   )}`;
-const phone = `tel:${company.phone.replace(/[^+\d]/g, '')}`;
 const mapQuery = 'Lot 16613-2, Lorong C6, Kampung Pandan, 55100 Kuala Lumpur';
 
 function WhatsAppButton({ service, children, className = '' }: { service?: string; children: React.ReactNode; className?: string }) {

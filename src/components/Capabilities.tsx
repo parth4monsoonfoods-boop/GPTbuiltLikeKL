@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, ArrowRight } from 'lucide-react';
-import { company } from '@/content/site';
 
 type PartKey = 'roof' | 'inside' | 'kitchen' | 'doors' | 'bath' | 'elec' | 'out' | 'base' | 'non';
 
@@ -95,8 +94,6 @@ export function Capabilities() {
   const [selectedPart, setSelectedPart] = useState<PartKey | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  const cleanWhatsApp = company.whatsapp.replace(/[^0-9]/g, '');
-
   const togglePart = (part: PartKey) => {
     setHasInteracted(true);
     setSelectedPart((prev) => (prev === part ? null : part));
@@ -114,8 +111,6 @@ export function Capabilities() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  const activeColor = selectedPart ? PARTS[selectedPart].color : '#55625A';
 
   return (
     <section id="what-we-do" className="bg-cream-100 pt-16 pb-12 lg:pt-20 lg:pb-14 scroll-mt-16">

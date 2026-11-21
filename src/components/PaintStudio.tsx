@@ -12,8 +12,6 @@ import { SectionHeading } from './SectionHeading';
 import { RoomPreview } from './RoomPreview';
 import { QuoteButton } from './CTAs';
 
-const DEFAULT_WALL = '#F5EFE6';
-const DEFAULT_ACCENT = '#E0D0BC';
 const DEFAULT_TRIM = '#FBF8F4';
 
 const climateIcons = [Wind, Sun, Droplet, Thermometer];

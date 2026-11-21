@@ -52,7 +52,7 @@ export function RepairHome() {
   const [faq, setFaq] = useState<number | null>(0);
   const [galleryPosition, setGalleryPosition] = useState({ start: true, end: false });
   const gallery = useRef<HTMLDivElement>(null);
-  useEffect(() => { try { setDark(localStorage.getItem('myn-theme') === 'dark'); } catch {} }, []);
+  useEffect(() => { try { setDark(localStorage.getItem('myn-theme') === 'dark'); } catch { /* storage unavailable */ } }, []);
   useEffect(() => {
     if (paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timer = window.setInterval(() => setSlide(value => (value + 1) % photos.length), 6500);
@@ -64,7 +64,7 @@ export function RepairHome() {
     window.addEventListener('keydown', close);
     return () => window.removeEventListener('keydown', close);
   }, [menu]);
-  function toggleTheme() { setDark(value => { try { localStorage.setItem('myn-theme', value ? 'light' : 'dark'); } catch {} return !value; }); }
+  function toggleTheme() { setDark(value => { try { localStorage.setItem('myn-theme', value ? 'light' : 'dark'); } catch { /* storage unavailable */ } return !value; }); }
   function moveGallery(direction: number) {
     const rail = gallery.current;
     if (rail) rail.scrollBy({ left: direction * ((rail.firstElementChild?.getBoundingClientRect().width || 330) + 24), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
