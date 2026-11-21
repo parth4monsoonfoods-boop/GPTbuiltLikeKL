@@ -1,0 +1,143 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: counter
+// Document ID: 'global'
+// Fields:
+//   - n: int or float (required, non-negative number for auto-incrementing property numbers)
+//
+// Collection: projects
+// Document ID: 16-character lowercase hexadecimal string (^[a-f0-9]{16}$)
+// Fields:
+//   - id: string (required, 16-char hex, must match document ID, immutable)
+//   - code: string (required, e.g. 'Property #1', max 50 chars, immutable)
+//   - reference: string (optional, client reference note, max 2000 chars, immutable)
+//   - photos: list (required, array of base64 data URLs or storage URLs, max 20 items, immutable)
+//   - createdAt: timestamp or string (required, creation timestamp or ISO date string max 50 chars, immutable)
+//   - response: map or null (required key; null when pending, or map with client response)
+//     Response map subfields:
+//       - siteName: string (required, 1-200 chars)
+//       - customerName: string (optional, 0-200 chars)
+//       - location: string (optional, 0-500 chars)
+//       - workDone: string (optional, 0-10000 chars)
+//       - majorWork: string (optional, 0-10000 chars)
+//       - challenges: string (optional, 0-10000 chars)
+//       - price: string (optional, 0-200 chars)
+//       - duration: string (optional, 0-200 chars)
+//       - submittedAt: timestamp or string (optional, max 50 chars or timestamp)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions & Domain Validators
+    // ===============================================================
+
+    // Validate 16-character lowercase hexadecimal project ID
+    function isValidProjectId(id) {
+      return id is string && id.matches('^[a-f0-9]{16}$');
+    }
+
+    // Validate counter document schema
+    function isValidCounter(data) {
+      return data.keys().hasOnly(['n']) &&
+             (data.n is int || data.n is float) &&
+             data.n >= 0;
+    }
+
+    // Validate counter monotonic non-decreasing increment
+    function isValidCounterUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['n']) &&
+             request.resource.data.n >= resource.data.n;
+    }
+
+    // Validate client response map structure and field lengths
+    function isValidResponse(res) {
+      return res == null || (
+        res is map &&
+        res.keys().hasOnly([
+          'siteName', 'customerName', 'location',
+          'workDone', 'majorWork', 'challenges',
+          'price', 'duration', 'submittedAt'
+        ]) &&
+        res.keys().hasAll(['siteName']) &&
+        res.siteName is string &&
+        res.siteName.size() >= 1 &&
+        res.siteName.size() <= 200 &&
+        (!('customerName' in res) || (res.customerName is string && res.customerName.size() <= 200)) &&
+        (!('location' in res) || (res.location is string && res.location.size() <= 500)) &&
+        (!('workDone' in res) || (res.workDone is string && res.workDone.size() <= 10000)) &&
+        (!('majorWork' in res) || (res.majorWork is string && res.majorWork.size() <= 10000)) &&
+        (!('challenges' in res) || (res.challenges is string && res.challenges.size() <= 10000)) &&
+        (!('price' in res) || (res.price is string && res.price.size() <= 200)) &&
+        (!('duration' in res) || (res.duration is string && res.duration.size() <= 200)) &&
+        (!('submittedAt' in res) || (res.submittedAt is timestamp || (res.submittedAt is string && res.submittedAt.size() <= 50)))
+      );
+    }
+
+    // Domain validator for project documents (used on both create and update)
+    function isValidProject(data, projectId) {
+      return data.keys().hasOnly(['id', 'code', 'reference', 'photos', 'createdAt', 'response']) &&
+             data.keys().hasAll(['id', 'code', 'photos', 'createdAt', 'response']) &&
+             data.id == projectId &&
+             data.code is string &&
+             data.code.size() >= 1 &&
+             data.code.size() <= 50 &&
+             (!('reference' in data) || (data.reference is string && data.reference.size() <= 2000)) &&
+             data.photos is list &&
+             data.photos.size() <= 20 &&
+             (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 50)) &&
+             isValidResponse(data.response);
+    }
+
+    // Validate that project update only mutates 'response' while keeping all other fields immutable
+    function isValidProjectUpdate(projectId) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['response']) &&
+             request.resource.data.id == resource.data.id &&
+             request.resource.data.code == resource.data.code &&
+             request.resource.data.photos == resource.data.photos &&
+             request.resource.data.createdAt == resource.data.createdAt &&
+             ((!('reference' in resource.data) && !('reference' in request.resource.data)) ||
+              (request.resource.data.reference == resource.data.reference)) &&
+             isValidProject(request.resource.data, projectId);
+    }
+
+    // ===============================================================
+    // Rules: Counter Collection
+    // ===============================================================
+    // Tracks running property number (e.g. Property #1, Property #2).
+    // Document ID is strictly 'global'. Deletions are forbidden.
+    match /counter/{counterId} {
+      allow get: if counterId == 'global';
+      allow list: if false;
+      allow create: if counterId == 'global' && isValidCounter(request.resource.data);
+      allow update: if counterId == 'global' && isValidCounter(request.resource.data) && isValidCounterUpdate();
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Rules: Projects Collection
+    // ===============================================================
+    // Keyed by 16-character hexadecimal project ID.
+    // - Direct read (get) allowed for clients with project link.
+    // - Listing projects, creating new projects, and deleting projects allowed for administration.
+    // - Updating is strictly confined to the 'response' field, preserving all project metadata.
+    match /projects/{projectId} {
+      allow get: if isValidProjectId(projectId);
+      allow list: if true;
+      allow create: if isValidProjectId(projectId) && isValidProject(request.resource.data, projectId);
+      allow update: if isValidProjectId(projectId) && isValidProjectUpdate(projectId);
+      allow delete: if isValidProjectId(projectId);
+    }
+
+    // Default deny for all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

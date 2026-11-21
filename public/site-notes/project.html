@@ -31,28 +31,96 @@
   <div class="msg" id="msg"></div>
 </div>
 </main>
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  projectId: "myndeco-enterprise",
+  appId: "1:976201580927:web:3c026017a7eac064435a4a",
+  apiKey: "AIzaSyAQMShxAVnSMusBbvlH5ZiIIgD4FjE1Ucc",
+  authDomain: "myndeco-enterprise.firebaseapp.com",
+  messagingSenderId: "976201580927"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 const $ = id => document.getElementById(id);
-const id = location.pathname.split('/')[2];
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id') || window.location.pathname.split('/').filter(Boolean).pop();
 const F = ['siteName', 'customerName', 'location', 'workDone', 'majorWork', 'challenges', 'price', 'duration'];
-fetch('/api/p/' + id).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+
+async function init() {
+  if (!id || id === 'project' || id === 'project.html') {
+    $('title').textContent = 'This link is not valid';
+    return;
+  }
+  let d = null;
+  try {
+    const snap = await getDoc(doc(db, "projects", id));
+    if (snap.exists()) d = snap.data();
+  } catch (e) {
+    console.warn("Firestore read error:", e);
+  }
+  if (!d) {
+    const local = JSON.parse(localStorage.getItem('site_notes_projects') || '[]');
+    d = local.find(x => x.id === id);
+  }
+  if (!d) {
+    $('title').textContent = 'This link is not valid';
+    return;
+  }
+
   $('title').textContent = 'Tell us about this job';
-  $('code').textContent = d.code; $('ref').textContent = d.reference || ''; $('refbox').hidden = false;
-  for (let i = 0; i < d.photos; i++) { const a = document.createElement('a'); a.href = `/api/p/${id}/photo/${i}`; a.target = '_blank'; a.innerHTML = `<img alt="Site photo ${i + 1}" src="/api/p/${id}/photo/${i}">`; $('photos').appendChild(a); }
-  if (d.response) { F.forEach(k => $(k).value = d.response[k] || ''); $('msg').textContent = 'You already sent answers. You can change them and save again.'; }
+  $('code').textContent = d.code;
+  $('ref').textContent = d.reference || '';
+  $('refbox').hidden = false;
+
+  $('photos').innerHTML = '';
+  (d.photos || []).forEach((src, i) => {
+    const a = document.createElement('a');
+    a.href = src; a.target = '_blank';
+    a.innerHTML = `<img alt="Site photo ${i + 1}" src="${src}">`;
+    $('photos').appendChild(a);
+  });
+
+  if (d.response) {
+    F.forEach(k => { $(k).value = d.response[k] || ''; });
+    $('msg').textContent = 'You already sent answers. You can change them and save again.';
+  }
   $('form').hidden = false;
-}).catch(() => { $('title').textContent = 'This link is not valid'; });
+}
+
+init();
 
 $('save').onclick = async () => {
   const m = $('msg');
-  if (!$('siteName').value.trim()) { m.className = 'msg err'; m.textContent = 'Please enter the site name.'; $('siteName').focus(); return; }
-  const body = {}; F.forEach(k => body[k] = $(k).value);
+  if (!$('siteName').value.trim()) {
+    m.className = 'msg err'; m.textContent = 'Please enter the site name.'; $('siteName').focus(); return;
+  }
+  const body = {};
+  F.forEach(k => { body[k] = $(k).value.trim(); });
+  body.submittedAt = new Date().toISOString();
+
   $('save').disabled = true; m.className = 'msg'; m.textContent = 'Saving…';
   try {
-    const r = await fetch('/api/p/' + id + '/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) throw 0;
+    try {
+      await updateDoc(doc(db, "projects", id), { response: body });
+    } catch (err) {
+      console.warn("Firestore update error:", err);
+    }
+    const cur = JSON.parse(localStorage.getItem('site_notes_projects') || '[]');
+    const idx = cur.findIndex(x => x.id === id);
+    if (idx >= 0) {
+      cur[idx].response = body;
+      localStorage.setItem('site_notes_projects', JSON.stringify(cur));
+    }
+
     m.className = 'msg ok'; m.textContent = 'Saved. Thank you.';
-  } catch { m.className = 'msg err'; m.textContent = 'Could not save. Check your internet and try again.'; }
+  } catch {
+    m.className = 'msg err'; m.textContent = 'Could not save. Check your internet and try again.';
+  }
   $('save').disabled = false;
 };
 </script></body></html>
