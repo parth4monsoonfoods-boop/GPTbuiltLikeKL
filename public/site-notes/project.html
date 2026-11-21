@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tell us about this job</title><link rel="stylesheet" href="/site-notes/style.css"></head>
+<body><main>
+<h1 id="title">Loading…</h1>
+<section class="box" id="refbox" hidden><p id="code" style="margin:0;font-weight:700"></p><p id="ref" style="margin:4px 0 0;white-space:pre-wrap"></p></section>
+<div class="photos" id="photos"></div>
+<p class="lead">Look at the photos and tell us what was done on this job. Short, plain answers are fine.</p>
+<div id="form" hidden>
+  <label for="siteName">Site name <span class="hint" style="display:inline">(required)</span></label>
+  <input id="siteName" placeholder="e.g. Taman Molek – kitchen">
+  <label for="customerName">Customer name</label>
+  <input id="customerName">
+  <label for="location">Location</label>
+  <p class="hint">Area or address of the site.</p>
+  <input id="location">
+  <label for="workDone">What work was done?</label>
+  <p class="hint">Everything that was done, in your own words.</p>
+  <textarea id="workDone"></textarea>
+  <label for="majorWork">What was the biggest or most important work?</label>
+  <textarea id="majorWork"></textarea>
+  <label for="challenges">What problems or challenges came up?</label>
+  <p class="hint">For example hidden damage, tight space, delays, changes by the owner.</p>
+  <textarea id="challenges"></textarea>
+  <label for="price">What was the price?</label>
+  <input id="price" placeholder="e.g. RM 18,500">
+  <label for="duration">How long did it take?</label>
+  <input id="duration" placeholder="e.g. 3 weeks">
+  <div class="row"><button id="save">Save my answers</button></div>
+  <div class="msg" id="msg"></div>
+</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const id = location.pathname.split('/')[2];
+const F = ['siteName', 'customerName', 'location', 'workDone', 'majorWork', 'challenges', 'price', 'duration'];
+fetch('/api/p/' + id).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+  $('title').textContent = 'Tell us about this job';
+  $('code').textContent = d.code; $('ref').textContent = d.reference || ''; $('refbox').hidden = false;
+  for (let i = 0; i < d.photos; i++) { const a = document.createElement('a'); a.href = `/api/p/${id}/photo/${i}`; a.target = '_blank'; a.innerHTML = `<img alt="Site photo ${i + 1}" src="/api/p/${id}/photo/${i}">`; $('photos').appendChild(a); }
+  if (d.response) { F.forEach(k => $(k).value = d.response[k] || ''); $('msg').textContent = 'You already sent answers. You can change them and save again.'; }
+  $('form').hidden = false;
+}).catch(() => { $('title').textContent = 'This link is not valid'; });
+
+$('save').onclick = async () => {
+  const m = $('msg');
+  if (!$('siteName').value.trim()) { m.className = 'msg err'; m.textContent = 'Please enter the site name.'; $('siteName').focus(); return; }
+  const body = {}; F.forEach(k => body[k] = $(k).value);
+  $('save').disabled = true; m.className = 'msg'; m.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/p/' + id + '/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw 0;
+    m.className = 'msg ok'; m.textContent = 'Saved. Thank you.';
+  } catch { m.className = 'msg err'; m.textContent = 'Could not save. Check your internet and try again.'; }
+  $('save').disabled = false;
+};
+</script></body></html>

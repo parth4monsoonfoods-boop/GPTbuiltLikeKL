@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Notes – Admin</title><link rel="stylesheet" href="/site-notes/style.css"></head>
+<body><main>
+<h1>Site Notes</h1>
+<p class="lead">Add the photos for a property (it is numbered automatically), send your client the link, and read his answers here. He fills in the site name himself.</p>
+
+<section class="box" id="login">
+  <label for="pw" style="margin-top:0">Admin password</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <div class="row"><button id="loginBtn">Sign in</button></div>
+  <div class="msg err" id="loginMsg"></div>
+</section>
+
+<div id="app" hidden>
+  <section class="box">
+    <label for="files" style="margin-top:0">Photos</label>
+    <p class="hint">Up to 12 photos. They are shrunk automatically before upload.</p>
+    <input id="files" type="file" accept="image/*" multiple>
+    <label for="ref">Note for your client</label>
+    <p class="hint">Optional. Anything that helps him recognise the job.</p>
+    <textarea id="ref"></textarea>
+    <div class="row"><button id="create">Create link for client</button></div>
+    <div class="msg" id="createMsg"></div>
+  </section>
+  <h2>Properties</h2>
+  <div id="list"><p class="msg">Loading…</p></div>
+</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let key = sessionStorage.getItem('key') || '';
+const api = (url, o = {}) => fetch(url, { ...o, headers: { ...(typeof o.body === 'string' ? { 'Content-Type': 'application/json' } : {}), 'x-admin-key': key } }).then(async r => {
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Request failed'); return d; });
+
+async function shrink(file) {
+  try {
+    const img = await createImageBitmap(file);
+    const s = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
+  } catch { return file; }
+}
+
+function summary(p) {
+  const r = p.response; if (!r) return '';
+  return `${p.code}\nSite name: ${r.siteName}\nCustomer: ${r.customerName}\nLocation: ${r.location}\nWork done: ${r.workDone}\nMajor work: ${r.majorWork}\nChallenges: ${r.challenges}\nPrice: ${r.price}\nDuration: ${r.duration}`;
+}
+
+async function load() {
+  const list = await api('/api/projects');
+  $('list').innerHTML = list.length ? '' : '<p class="msg">No properties yet. Create one above.</p>';
+  list.forEach(p => {
+    const el = document.createElement('section'); el.className = 'box';
+    const r = p.response, link = location.origin + '/p/' + p.id;
+    el.innerHTML = `<strong>${esc(r ? r.siteName : p.code)}</strong> <span class="tag">${esc(p.code)}</span> <span class="tag ${r ? 'done' : ''}">${r ? 'Answered' : 'Waiting for client'}</span>
+      ${p.reference ? `<p class="hint" style="margin-top:8px;white-space:pre-wrap">${esc(p.reference)}</p>` : ''}
+      <div class="photos">${Array.from({ length: p.photos || 0 }, (_, i) => `<a href="/api/p/${p.id}/photo/${i}" target="_blank"><img loading="lazy" alt="Photo ${i + 1}" src="/api/p/${p.id}/photo/${i}"></a>`).join('')}</div>
+      ${r ? `<dl><dt>Site name</dt><dd>${esc(r.siteName)}</dd><dt>Customer name</dt><dd>${esc(r.customerName)}</dd><dt>Location</dt><dd>${esc(r.location)}</dd><dt>Work done</dt><dd>${esc(r.workDone)}</dd><dt>Major work</dt><dd>${esc(r.majorWork)}</dd><dt>Challenges</dt><dd>${esc(r.challenges)}</dd><dt>Price</dt><dd>${esc(r.price)}</dd><dt>Duration</dt><dd>${esc(r.duration)}</dd></dl>` : ''}
+      <div class="row"><button class="quiet" data-a="link">Copy client link</button>${r ? '<button class="quiet" data-a="sum">Copy summary</button>' : ''}<button class="quiet" data-a="del">Delete</button></div>`;
+    el.querySelector('[data-a=link]').onclick = e => { navigator.clipboard.writeText(link); e.target.textContent = 'Link copied'; };
+    const s = el.querySelector('[data-a=sum]'); if (s) s.onclick = e => { navigator.clipboard.writeText(summary(p)); e.target.textContent = 'Summary copied'; };
+    el.querySelector('[data-a=del]').onclick = async () => { if (confirm('Delete this property and its photos?')) { await api('/api/projects/' + p.id, { method: 'DELETE' }); load(); } };
+    $('list').appendChild(el);
+  });
+}
+
+async function enter() {
+  try { await api('/api/projects'); } catch (e) { $('loginMsg').textContent = e.message; return; }
+  sessionStorage.setItem('key', key); $('login').hidden = true; $('app').hidden = false; load();
+}
+$('loginBtn').onclick = () => { key = $('pw').value; enter(); };
+$('pw').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };
+if (key) enter();
+
+$('create').onclick = async () => {
+  const m = $('createMsg'); m.className = 'msg'; $('create').disabled = true; m.textContent = 'Creating…';
+  try {
+    const fd = new FormData(); fd.append('reference', $('ref').value);
+    for (const f of [...$('files').files].slice(0, 12)) fd.append('photos', await shrink(f), 'photo.jpg');
+    await api('/api/projects', { method: 'POST', body: fd });
+    m.className = 'msg ok'; m.textContent = 'Created. Copy the client link below.';
+    $('files').value = ''; $('ref').value = ''; load();
+  } catch (e) { m.className = 'msg err'; m.textContent = e.message; }
+  $('create').disabled = false;
+};
+</script></body></html>
